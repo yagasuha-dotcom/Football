@@ -31,6 +31,9 @@ function normalizeStatus(rawState) {
   if (s.includes('not started') || s.includes('postponed') || s.includes('scheduled')) {
     return 'scheduled';
   }
+  if (s.includes('finished') || s.includes('ft') || s.includes('ended') || s.includes('after')) {
+    return 'finished';
+  }
   if (
     s.includes('half') ||
     s.includes('live') ||
@@ -40,10 +43,30 @@ function normalizeStatus(rawState) {
   ) {
     return 'live';
   }
-  if (s.includes('finished') || s.includes('ft') || s.includes('ended') || s.includes('after')) {
-    return 'finished';
-  }
   return 'scheduled';
+}
+
+// Menit di lapangan bisa lebih dari 90 (injury time) — kalau sudah lewat 125
+// menit tapi status API masih bilang "live", anggap datanya belum ter-update
+// dan treat sebagai selesai agar tidak nyangkut selamanya di kolom Live.
+function isStaleLive(clockMinute) {
+  const n = parseInt(clockMinute, 10);
+  return !isNaN(n) && n >= 125;
+}
+
+// state.score.current kadang berupa string "2-1", kadang objek {home, away}
+function parseScore(scoreCurrent, side) {
+  if (scoreCurrent == null) return null;
+  if (typeof scoreCurrent === 'object') {
+    return scoreCurrent[side] ?? null;
+  }
+  if (typeof scoreCurrent === 'string') {
+    const parts = scoreCurrent.split('-').map((p) => p.trim());
+    if (parts.length === 2) {
+      return side === 'home' ? parts[0] : parts[1];
+    }
+  }
+  return null;
 }
 
 function extractEvents(events, teamId) {
@@ -60,11 +83,16 @@ function extractEvents(events, teamId) {
 function mapMatch(m) {
   const homeId = m.homeTeam?.id;
   const awayId = m.awayTeam?.id;
-  const status = normalizeStatus(m.state?.description || m.status);
+  let status = normalizeStatus(m.state?.description || m.status);
+  const clock = m.state?.clock;
+
+  if (status === 'live' && isStaleLive(clock)) {
+    status = 'finished';
+  }
 
   let minuteDisplay = null;
   if (status === 'live') {
-    minuteDisplay = m.state?.clock ? `${m.state.clock}'` : m.state?.description;
+    minuteDisplay = clock ? `${clock}'` : m.state?.description;
   } else if (status === 'scheduled' && m.date) {
     try {
       const d = new Date(m.date);
@@ -76,14 +104,16 @@ function mapMatch(m) {
     }
   }
 
+  const scoreCurrent = m.state?.score?.current;
+
   return {
     id: m.id,
     competitionName: m.league?.name || m.competition?.name || '',
     status,
     minute: minuteDisplay,
     rawDate: m.date || null,
-    homeScore: m.state?.score?.current?.home ?? m.homeScore ?? null,
-    awayScore: m.state?.score?.current?.away ?? m.awayScore ?? null,
+    homeScore: parseScore(scoreCurrent, 'home') ?? m.homeScore ?? null,
+    awayScore: parseScore(scoreCurrent, 'away') ?? m.awayScore ?? null,
     homeTeam: {
       name: m.homeTeam?.name || 'Home',
       logo: m.homeTeam?.logo || null,
