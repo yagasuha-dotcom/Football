@@ -9,7 +9,7 @@
 
 2. Copy `.env.example` jadi `.env.local`, lalu isi API key kamu:
    ```
-   HIGHLIGHTLY_API_KEY=key_kamu_dari_highlightly.net
+   HIGHLIGHTLY_API_KEY=isi_dengan_api_key_kamu
    ```
 
 3. Jalankan:
@@ -25,26 +25,59 @@
 3. Set environment variable `HIGHLIGHTLY_API_KEY` di dashboard hosting (JANGAN taruh di kode)
 4. Deploy
 
+## Setup notifikasi Discord (fitur baru)
+
+Fitur ini kirim notifikasi otomatis ke Discord tiap ada kickoff, gol, kartu merah,
+atau pertandingan World Cup selesai.
+
+### 1. Tambahkan Redis (Upstash) di Vercel
+Vercel KV sudah deprecated, penggantinya Upstash Redis lewat Vercel Marketplace:
+1. Buka project kamu di dashboard Vercel -> tab **Storage**
+2. Klik **Create Database** -> pilih **Upstash** -> **Redis**
+3. Ikuti wizard, hubungkan ke project ini
+4. Vercel otomatis menambahkan environment variable `KV_REST_API_URL` dan
+   `KV_REST_API_TOKEN` ke project — tidak perlu diisi manual
+
+### 2. Tambahkan environment variable
+Di **Settings -> Environment Variables**, tambahkan:
+- `DISCORD_WEBHOOK_URL` — link webhook Discord kamu (dari Server Settings ->
+  Integrations -> Webhooks). **Jangan pernah taruh ini di kode atau share di
+  tempat publik.**
+- `CRON_SECRET` — string acak minimal 16 karakter, untuk mengamankan endpoint
+  cron supaya orang lain tidak bisa memicunya sembarangan.
+
+### 3. Setup pemanggil cron eksternal
+Karena Vercel Hobby (plan gratis) cuma bisa jalankan cron built-in 1x/hari,
+untuk cek tiap 1-2 menit kita pakai layanan eksternal gratis:
+
+1. Daftar di **https://cron-job.org** (gratis, tanpa kartu kredit)
+2. Buat cronjob baru dengan setting:
+   - URL: `https://domain-vercel-kamu.vercel.app/api/cron/check-events`
+   - Method: GET
+   - Header tambahan: `Authorization: Bearer <isi dengan CRON_SECRET yang sama>`
+   - Interval: tiap 1-2 menit
+3. Simpan dan aktifkan
+
+Setelah ini aktif, setiap ada kickoff/gol/kartu merah/pertandingan selesai di
+World Cup, notifikasi otomatis akan masuk ke channel Discord kamu.
+
 ## Catatan penting
 
-- **Endpoint Highlightly**: Aku set default endpoint di `lib/highlightly.js` berdasarkan dokumentasi umum
-  provider ini (`/matches`, `/highlights`, `/leagues`). Kalau setelah deploy ada error 404/400,
-  cek dokumentasi resmi di dashboard Highlightly kamu (biasanya ada tab "API Reference") dan
-  sesuaikan nama path/parameter di file itu — strukturnya sudah rapi jadi tinggal ganti nama field.
+- **Endpoint Highlightly**: base URL resmi adalah `https://soccer.highlightly.net`,
+  header yang dipakai `x-rapidapi-key`.
 
-- **Foto pemain**: Field `heroImageUrl` di setiap match diambil dari API kalau tersedia.
-  Kalau API-nya nggak ngasih foto pemain (cuma logo tim), kartu otomatis fallback ke
-  placeholder gradient dengan nama kompetisi.
+- **Foto pemain**: Free tier Highlightly umumnya tidak menyediakan foto pemain
+  individual, hanya logo tim.
 
-- **Override manual foto**: Kalau mau pasang foto sendiri untuk match tertentu, kirim POST ke:
-  ```
-  POST /api/overrides
-  { "matchId": "12345", "heroImageUrl": "https://url-foto-kamu.jpg" }
-  ```
-  Foto itu akan otomatis dipakai menggantikan yang dari API untuk match tersebut.
+- **Override manual foto**: kirim POST ke `/api/overrides` dengan body
+  `{ "matchId": "...", "heroImageUrl": "https://..." }`.
 
-- **Highlight video**: Modal akan otomatis coba deteksi link YouTube dari data API
-  dan embed sebagai iframe resmi (bukan re-upload).
+- **Highlight video**: Muncul di card match yang sudah selesai, biasanya
+  tersedia 0-48 jam setelah pertandingan berakhir.
 
-- **Polling**: Halaman utama polling tiap 15 detik kalau ada match live, atau 30 detik
-  kalau tidak ada — supaya hemat kuota API gratis (100 request/hari).
+- **Notifikasi Discord**: Hanya untuk pertandingan World Cup 2026 (leagueId 1635
+  di Highlightly). State terakhir tiap match disimpan di Redis dengan TTL 3 hari.
+
+- **Polling**: Halaman utama polling tiap 15/30 detik. Cron notifikasi Discord
+  terpisah dan juga memakai kuota API yang sama, jadi total pemakaian perlu
+  diperhatikan saat World Cup ramai (limit 100 request/hari di free tier).
