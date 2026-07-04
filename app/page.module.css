@@ -1,0 +1,94 @@
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.headerTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.logo {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 1.6rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.logo span {
+  color: var(--mint);
+}
+
+.updated {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterBtn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filterBtn:hover {
+  color: var(--text);
+}
+
+.filterActive {
+  background: var(--mint);
+  border-color: var(--mint);
+  color: #04140f;
+  font-weight: 700;
+}
+
+.errorBox {
+  background: rgba(255, 59, 92, 0.1);
+  border: 1px solid rgba(255, 59, 92, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.errorBox p {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.errorHint {
+  color: var(--text-dim);
+  font-size: 0.8rem !important;
+}
+
+.loading,
+.empty {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 60px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
