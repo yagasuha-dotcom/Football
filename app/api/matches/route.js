@@ -99,14 +99,34 @@ function mapMatch(m) {
   };
 }
 
+// World Cup 2026 punya leagueId khusus di Highlightly — tidak selalu muncul
+// di endpoint /matches umum tanpa filter ini secara eksplisit.
+const WORLD_CUP_LEAGUE_ID = '1635';
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date') || new Date().toISOString().slice(0, 10);
   const leagueId = searchParams.get('leagueId') || undefined;
 
   try {
-    const raw = await getMatches({ date, leagueId });
-    const rawList = Array.isArray(raw) ? raw : raw?.data || [];
+    const [generalRaw, worldCupRaw] = await Promise.all([
+      getMatches({ date, leagueId }),
+      leagueId ? Promise.resolve([]) : getMatches({ date, leagueId: WORLD_CUP_LEAGUE_ID }),
+    ]);
+
+    const generalList = Array.isArray(generalRaw) ? generalRaw : generalRaw?.data || [];
+    const worldCupList = Array.isArray(worldCupRaw) ? worldCupRaw : worldCupRaw?.data || [];
+
+    // Gabungkan tanpa duplikat (World Cup match mungkin sudah ada di list umum)
+    const seenIds = new Set();
+    const rawList = [];
+    for (const m of [...worldCupList, ...generalList]) {
+      if (!seenIds.has(m.id)) {
+        seenIds.add(m.id);
+        rawList.push(m);
+      }
+    }
+
     const overrides = getAllOverrides();
 
     const matches = rawList.map((m) => {
