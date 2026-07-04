@@ -8,7 +8,12 @@ export async function GET(request) {
 
   try {
     const data = await getHighlights({ matchId, leagueId, limit: 5 });
-    return NextResponse.json({ highlights: data?.data || data || [] });
+    const list = Array.isArray(data) ? data : data?.data || [];
+    const highlights = list.map((h) => ({
+      title: h.title,
+      url: h.url || h.embedUrl,
+    }));
+    return NextResponse.json({ highlights });
   } catch (err) {
     return NextResponse.json(
       { error: err.message, highlights: [] },
