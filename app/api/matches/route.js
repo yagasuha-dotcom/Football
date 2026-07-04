@@ -2,13 +2,26 @@ import { NextResponse } from 'next/server';
 import { getMatches } from '@/lib/highlightly';
 import { getAllOverrides } from '@/lib/overrides';
 
-// Highlightly memakai state seperti "not_started", "live", "finished", dst.
-// Normalisasi ke status yang dipahami frontend: scheduled | live | finished
+// Highlightly memakai status seperti "Not started", "First Half", "Halftime",
+// "Second Half", "Finished", "Postponed", dst.
 function normalizeStatus(rawState) {
   if (!rawState) return 'scheduled';
   const s = String(rawState).toLowerCase();
-  if (s.includes('live') || s.includes('half') || s.includes('progress')) return 'live';
-  if (s.includes('finished') || s.includes('ft') || s.includes('ended')) return 'finished';
+  if (s.includes('not started') || s.includes('postponed') || s.includes('scheduled')) {
+    return 'scheduled';
+  }
+  if (
+    s.includes('half') ||
+    s.includes('live') ||
+    s.includes('progress') ||
+    s.includes('extra time') ||
+    s.includes('penalt')
+  ) {
+    return 'live';
+  }
+  if (s.includes('finished') || s.includes('ft') || s.includes('ended') || s.includes('after')) {
+    return 'finished';
+  }
   return 'scheduled';
 }
 
@@ -26,11 +39,27 @@ function extractEvents(events, teamId) {
 function mapMatch(m) {
   const homeId = m.homeTeam?.id;
   const awayId = m.awayTeam?.id;
+  const status = normalizeStatus(m.state?.description || m.status);
+
+  let minuteDisplay = null;
+  if (status === 'live') {
+    minuteDisplay = m.state?.clock ? `${m.state.clock}'` : m.state?.description;
+  } else if (status === 'scheduled' && m.date) {
+    try {
+      minuteDisplay = new Date(m.date).toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      minuteDisplay = null;
+    }
+  }
+
   return {
     id: m.id,
     competitionName: m.league?.name || m.competition?.name || '',
-    status: normalizeStatus(m.state?.description || m.status),
-    minute: m.state?.clock || m.state?.description || null,
+    status,
+    minute: minuteDisplay,
     homeScore: m.state?.score?.current?.home ?? m.homeScore ?? null,
     awayScore: m.state?.score?.current?.away ?? m.awayScore ?? null,
     homeTeam: {
@@ -44,7 +73,7 @@ function mapMatch(m) {
     homeEvents: extractEvents(m.events, homeId),
     awayEvents: extractEvents(m.events, awayId),
     heroImageUrl: null, // API football gratis biasanya tidak sediakan foto pemain individual
-    hasHighlight: normalizeStatus(m.state?.description || m.status) === 'finished',
+    hasHighlight: status === 'finished',
   };
 }
 
